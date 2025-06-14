@@ -1,49 +1,131 @@
 # ios-inject-custom
 
-Example showing how to use Frida for standalone injection of a custom
-payload. The payload is a .dylib that uses Gum, Frida's low-level
-instrumentation library, to hook `open()` and print the arguments on
-`stderr` every time it's called. The payload could be any shared library
-as long as it exports a function with the name that you specify when
-calling `inject_library_file_sync()`. In our example we named it
-`example_agent_main`. This function will also be passed a string of
-data, which you can use for application-specific purposes.
+Cross-platform iOS injection example using [Frida](https://frida.re). This project demonstrates how to inject a custom dynamic library (`agent.dylib`) into a running iOS process using Frida's low-level APIs.
 
-Note that only the build system is iOS-specific, so this example is
-easily portable to all other OSes supported by Frida.
+✅ **Builds on macOS and Linux**
+✅ **Supports Frida 17.1.5**
+✅ **Swift runtime support**
+✅ **Mock builds on Linux (for testing only)**
+✅ **Improved error handling and diagnostics**
 
-# Prerequisites
+---
 
-- Xcode
-- Jailbroken iOS device
+## 📦 Features
 
-# Running
+* Hooks `open()` and logs file access from the target process
+* Uses Frida Gum to implement the hook
+* Works on modern iOS versions (14.0+)
+* Automatically resolves Swift runtime issues (`@rpath/libswift*.dylib`)
+* Platform-aware `Makefile` (macOS: real build, Linux: mock binaries)
 
-```sh
-$ make
+---
+
+## 🛠️ Requirements
+
+### macOS
+
+* Xcode with iOS SDK
+* Jailbroken iOS device (for testing)
+
+### Linux
+
+* `clang`, `make`, `curl`, `xz-utils`
+* No iOS SDK required (builds mock binaries)
+
+---
+
+## 🚀 Build Instructions
+
+### macOS
+
+```bash
+make clean
+make
 ```
 
-This will build the injector, the payload, and an example program you
-can inject the payload into to easily observe the results.
+### Linux
 
-Next copy the `bin/` directory onto your iOS device someplace outside the
-sandbox, e.g. `/usr/local/ios-inject-example/`. (Technically only the `inject`
-binary needs to be located outside the sandbox.)
-
-In one terminal SSH to your device and launch the `victim` binary:
-
-```sh
-$ ./victim
-Victim running with PID 1303
+```bash
+sudo apt install clang build-essential curl xz-utils
+make clean
+make
 ```
 
-Then in another terminal change directory to where the `inject` binary
-is and run it:
+### Test Build
 
-```sh
-$ ./inject 1303
-$
+```bash
+chmod +x test-build.sh
+./test-build.sh
 ```
 
-You should now see a message printed by the `victim` process every time
-`open()` is called.
+---
+
+## 📂 Project Structure
+
+```
+ios-inject-custom/
+├── Makefile           # Cross-platform build system
+├── agent.c            # Hook logic using Gum
+├── inject.c           # Injector logic using frida-core
+├── victim.c           # Test target (calls open())
+├── inject.xcent       # iOS entitlements (only used on macOS)
+├── test-build.sh      # Build verification script
+├── COPYING.txt        # License (Public Domain)
+└── README.md          # This file
+```
+
+---
+
+## 🧪 How It Works
+
+1. `victim` runs in a loop and calls `open()` on system files
+2. `inject` uses Frida's injector APIs to inject `agent.dylib`
+3. `agent.dylib` hooks `open()` and logs all calls to `stderr`
+
+---
+
+## 🔗 Deployment (iOS Device)
+
+```bash
+# Copy binaries to your jailbroken iOS device
+scp -r bin/ root@<device-ip>:/var/root/ios-inject-example
+```
+
+---
+
+## ✅ Runtime Example
+
+```bash
+# Terminal 1 on device
+cd /var/root/ios-inject-example
+./victim
+# Victim running with PID 1234
+
+# Terminal 2 on device
+./inject 1234
+# [+] Agent loaded successfully
+# [+] Successfully hooked open()
+# [YYYY-MM-DD HH:MM:SS] open("/etc/hosts", 0x0)
+```
+
+---
+
+## 🧰 Troubleshooting
+
+### Common Issues
+
+| Error                                 | Solution                                                      |
+| ------------------------------------- | ------------------------------------------------------------- |
+| `@rpath/libswiftCore.dylib` not found | Automatically fixed by Makefile using `install_name_tool`     |
+| `xcrun` not found                     | Only needed on macOS. Ignored on Linux                        |
+| `lipo`, `codesign` not found          | Used on macOS. Skipped on Linux                               |
+| `Injection failed`                    | Make sure the process exists and has appropriate entitlements |
+
+---
+
+## 📜 License
+
+This software is released into the public domain. See `COPYING.txt`.
+
+---
+
